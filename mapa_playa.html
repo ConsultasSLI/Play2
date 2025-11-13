@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Mapa de Playa & Dársenas — hoy.json</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#0f172a; --ink:#e5e7eb; --muted:#9aa5b1;
+    --panel:#0b1220; --lane:#3a4a62;
+    --truckText:#0b1220;
+
+    --asig-bg:#f59e0b;  --asig-ink:#111827;
+    --ini-bg:#06b6d4;   --ini-ink:#05202a;
+    --fin-bg:#8b5cf6;   --fin-ink:#0c0520;
+  }
+
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Ubuntu;
+    display:grid; place-items:center;
+  }
+  .app{width:95vw; max-width:1400px;}
+
+  .yard{
+    position:relative; width:100%; aspect-ratio:16/9;
+    background:#0a1120; border:1px solid #203048; border-radius:12px;
+    overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .map-layer{position:absolute; inset:0}
+  .overlay{position:absolute; inset:0; pointer-events:none}
+
+  .border{fill:none; stroke:#1e2a3a; stroke-width:.6}
+  .panel{fill:var(--panel); stroke:#2a3a52; stroke-width:.6}
+  .dock-part{stroke:#3d536d; stroke-width:.6}
+  .lane{stroke:var(--lane); stroke-width:.5; stroke-dasharray:2 2; opacity:.85}
+
+  .truck{
+    position:absolute; transform-origin:center center;
+    color:var(--truckText); border:1px solid #00000033; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.35);
+    pointer-events:auto; user-select:none; overflow:hidden;
+    transition:transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+    font-weight:700; letter-spacing:.3px;
+  }
+
+  .tc{width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .tc-h{flex-direction:row;gap:14px;padding:10px 14px}
+  .tc-v{flex-direction:column;gap:10px;padding:12px 8px}
+  .tc .left{min-width:84px;text-align:center;font-weight:1000}
+  .tc .mid{line-height:1.08;font-weight:900;text-align:center}
+  .tc .mid b{font-weight:1000}
+
+ .tc-raw{ padding:8px 6px; gap:6px; }
+.tc-raw .big{ line-height:1.05; font-weight:1000; }
+
+  .event-pill{
+    display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+    min-width:72px;max-width:120px;box-sizing:border-box;
+    padding:8px 10px;border-radius:12px;border:2px solid rgba(0,0,0,.18);
+    text-align:center;white-space:normal;overflow-wrap:anywhere;line-height:1.05;
+    font-weight:1000;animation:blinkSoft 1.25s ease-in-out infinite
+  }
+  .ev-asig{background:var(--asig-bg);color:var(--asig-ink)}
+  .ev-ini{background:var(--ini-bg);color:var(--ini-ink)}
+  .ev-fin{background:var(--fin-bg);color:var(--fin-ink)}
+  .tc-v .event-pill{width:100%;max-width:unset}
+
+  .timer{
+    margin-top:6px;padding:6px 10px;border-radius:10px;
+    background:rgba(255,255,255,.12);color:var(--ink);border:1px solid rgba(0,0,0,.25);
+    font-family:ui-monospace,Menlo,Consolas,"Courier New",monospace;
+    font-variant-numeric:tabular-nums;font-weight:1000
+  }
+  .timer.overdue{background:#ef4444;color:#fff;border-color:#7f1d1d;animation:blinkHard .8s ease-in-out infinite}
+
+  @keyframes blinkSoft{0%,100%{filter:brightness(.96)}50%{filter:brightness(1.22)}}
+  @keyframes blinkHard{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+
+  .loading{
+    position:absolute; inset:auto 10px 10px auto; background:#142031; border:1px solid #2a3a52;
+    color:#cfe3ff; padding:6px 10px; border-radius:8px; font-size:12px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="yard" id="yard">
+      <!-- SVG del plano -->
+  <div class="map-layer" aria-hidden="true">
+        <!-- Aumenté el viewBox a 180x100 y ensanché PRESENTADO y PLAYA -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 100" width="100%" height="100%">
+          <rect class="border" x="0.25" y="0.25" width="179.5" height="99.5" rx="1.6"/>
+          <!-- PRESENTADO: x=2, width=16 (antes 8) -->
+          <rect class="panel" x="2"  y="6" width="13" height="93" rx="0"/>
+          <!-- PLAYA: desplazado y más ancho para mantener proporción -->
+          <rect class="panel" x="16" y="6" width="20" height="93" rx="1.2"/>
+          <!-- ALERO -->
+          <rect class="panel" x="108" y="0.2" width="72" height="21" rx="0"/>
+          <!-- CARPA -->
+          <rect class="panel" x="150" y="23" width="30" height="72" rx="0"/>
+
+          <!-- Docks inferiores (desplazados +20 respecto del original) -->
+          <g id="docks">
+            <rect x="46" y="86" height="12" style="fill:var(--panel);stroke:none" width="98"></rect>
+            <line class="dock-part" x1="46"  y1="86" x2="46"  y2="100"></line>
+            <line class="dock-part" x1="76"  y1="86" x2="76"  y2="100"></line>
+            <line class="dock-part" x1="106" y1="86" x2="106" y2="100"></line>
+            <line class="dock-part" x1="136" y1="86" x2="136" y2="100"></line>
+
+            <line class="lane" x1="46"  y1="86" x2="46"  y2="50"></line>
+            <line class="lane" x1="76"  y1="86" x2="76"  y2="50"></line>
+            <line class="lane" x1="106" y1="86" x2="106" y2="50"></line>
+            <line class="lane" x1="136" y1="86" x2="136" y2="50"></line>
+            <text x="9"  y="4" font-size="2" fill="#9fb3d1" text-anchor="middle">PRESENTADOS</text>
+             <text x="25"  y="4" font-size="2" fill="#9fb3d1" text-anchor="middle">PLAYA</text>
+            <text x="61"  y="98.5" font-size="3" fill="#9fb3d1" text-anchor="middle">DOCK1</text>
+            <text x="91"  y="98.5" font-size="3" fill="#9fb3d1" text-anchor="middle">DOCK2</text>
+            <text x="121" y="98.5" font-size="3" fill="#9fb3d1" text-anchor="middle">DOCK3</text>
+            <text x="162" y="98.5" font-size="3" fill="#9fb3d1" text-anchor="middle">CARPA</text>
+            <text x="80" y="4.5"  font-size="3" fill="#9fb3d1" text-anchor="middle">ALERO</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="overlay" id="overlay"></div>
+      <div class="loading" id="loading" style="display: none;">Cargando…</div>
+    </div>
+  </div>
+
+<script>
+/* ==== Config dársena & equipos ==== */
+var STATE={map:{width_m:140,height_m:100},docks:[
+  {id:'PRESENTADO',x:6.5,y:12,angle:0,scale:0.9,hScale:0.9,stack:'screenY',sep_m:1},
+  {id:'PLAYA', x:14, y:14, angle:45, scale:1.1, hScale:0, stack:'screenY', sep_m:1, anchor:'left'},
+  {id:'ALERO',x:112,y:11,angle:0,scale:3,hScale:0,stack:'along',sep_m:1},
+  {id:'DOCK1',x:48,y:93,angle:-90,scale:3,hScale:0,stack:'upBase',sep_m:1},
+  {id:'DOCK2',x:71,y:93,angle:-90,scale:3,hScale:0,stack:'upBase',sep_m:1},
+  {id:'DOCK3',x:95,y:93,angle:-90,scale:3,hScale:0,stack:'upBase',sep_m:1},
+  {id:'CARPA',x:128,y:93,angle:-90,scale:3,hScale:0,stack:'upBase',sep_m:1}
+],eqLengthsM:{'SEMI':18,'SEMI DOBLE':18,'ACOPLADO':18,'14TN':15,'8TN':12,'4TN':10,'2TN':8,'0.5TN':6},basePxH:50};
+
+/* === SLA PARAMETRIZABLE ===
+   - Cambiá minutos por evento en "defaults".
+   - Poné overrides por equipo en "byEquipo".
+*/
+var SLA_CONFIG = {
+  defaults: {
+    'ASIGNACION DE CARGA': 20,   // minutos
+    'INICIO DE CARGA': 20,
+    'FIN DE CARGA': 20
+  },
+  byEquipo: {
+    'SEMI':        { 'INICIO DE CARGA': 20, 'ASIGNACION DE CARGA': 20, 'FIN DE CARGA': 20 },
+    'SEMI DOBLE':  { 'INICIO DE CARGA': 20, 'ASIGNACION DE CARGA': 20, 'FIN DE CARGA': 20 },
+    '4TN':         { 'INICIO DE CARGA': 20, 'ASIGNACION DE CARGA': 20, 'FIN DE CARGA': 20 }
+    // Agregá '8TN', '14TN', etc. si querés otros tiempos
+  }
+};
+
+/* ==== Colores por dársena ==== */
+var DOCK_COLORS={'PRESENTADO':{bg:'#2a4365',ink:'#e6f0ff'},'PLAYA':{bg:'#1f5e3b',ink:'#e7ffe9'},'PLAY2':{bg:'#3b2f6b',ink:'#efe8ff'},'DOCK1':{bg:'#6b2f2f',ink:'#ffecec'},'DOCK2':{bg:'#6b4f1f',ink:'#fff2dc'},'DOCK3':{bg:'#265d5d',ink:'#e8ffff'},'ALERO':{bg:'#5a315d',ink:'#ffe9ff'},'CARPA':{bg:'#27472f',ink:'#e9ffe9'}};
+var DEFAULT_DOCK={bg:'#243b53',ink:'#e8f0ff'};
+function getDockColor(name){return DOCK_COLORS[String(name||'').toUpperCase()]||DEFAULT_DOCK;}
+
+/* ==== Fallback de datos ==== */
+var SAMPLE_JSON={ok:true,meta:{ts_ba:"2025-11-11 21:27:27"},
+en_planta_rows:[
+  {hr:'18220',patente:'LUX680',darsenaActual:'ALERO',tipo_viaje:'Coatings',tipo_equipo:'14TN'},
+  {hr:'18246',patente:'AE906YY',darsenaActual:'DOCK1',tipo_viaje:'DOCK3',tipo_equipo:'SEMI'},
+  {hr:'18250',patente:'AA698XW',darsenaActual:'DOCK2',tipo_viaje:'Alero',tipo_equipo:'0.5TN'},
+  {hr:'18245',patente:'AC383AG',darsenaActual:'PLAYA',tipo_viaje:'Carpa',tipo_equipo:'SEMI'},
+  {hr:'18277',patente:'AC344AG',darsenaActual:'DOCK3',tipo_viaje:'Carpa',tipo_equipo:'4TN'},
+  {hr:'18277',patente:'AC344AG',darsenaActual:'CARPA',tipo_viaje:'Carpa',tipo_equipo:'14TN'},
+  {hr:'18277',patente:'AC344AG',darsenaActual:'PLAY2',tipo_viaje:'Carpa',tipo_equipo:'0.5TN'},
+  {hr:'18277',patente:'AC344AG',darsenaActual:'PRESENTADO',tipo_viaje:'Carpa',tipo_equipo:'0.5TN'},
+  {hr:'18277',patente:'AC344AG',darsenaActual:'PLAYA',tipo_viaje:'Carpa',tipo_equipo:'0.5TN'},
+  {hr:'18218',patente:'AC111CO',darsenaActual:'PLAYA',tipo_equipo:'0.5TN'},
+  {hr:'18247',patente:'PIK147',darsenaActual:'PLAYA',tipo_equipo:'0.5TN'}
+],
+en_planta_movs:[
+  {hr:'18220',darsena:'Inicio de Carga',fecha:'21:27'},
+  {hr:'18246',darsena:'DOCK3',fecha:'17:09'},
+  {hr:'18250',darsena:'Fin de Carga',fecha:'15:53'},
+  {hr:'18245',darsena:'Asignacion de Carga',fecha:'16:17'}
+]};
+
+/* ==== Helpers ==== */
+var overlay=document.getElementById('overlay'),loading=document.getElementById('loading'),LAST_BY_HR={};
+
+function normalizeDockName(s){if(!s)return'';var n=String(s).trim().toUpperCase();if(n==='PLAY 2'||n==='PLAY2')return'PRESENTADO';if(/^DOCK\s*1$/.test(n))return'DOCK1';if(/^DOCK\s*2$/.test(n))return'DOCK2';if(/^DOCK\s*3$/.test(n))return'DOCK3';return n;}
+function eqLenM(t){t=(t||'').toUpperCase();return STATE.eqLengthsM[t]||10;}
+function toPx(xm,ym){var w=overlay.clientWidth,h=overlay.clientHeight,sx=w/STATE.map.width_m,sy=h/STATE.map.height_m;return{x:xm*sx,y:ym*sy,sx:sx,sy:sy};}
+function clearOverlay(){overlay.innerHTML='';}
+function hmToInt(txt){var m=/(\d{1,2}):(\d{2})/.exec(txt||'');return m?(+m[1])*60+(+m[2]):-1;}
+function hhmmToEpoch(hhmm){var m=/(\d{1,2}):(\d{2})/.exec(hhmm||''),now=new Date();if(!m)return 0;var d=new Date(now.getFullYear(),now.getMonth(),now.getDate(),+m[1],+m[2],0,0);if(d.getTime()>now.getTime())d.setDate(d.getDate()-1);return d.getTime();}
+function buildLastEventByHr(movs){var idx={},m,hr,t,score,name;movs=movs||[];for(var i=0;i<movs.length;i++){m=movs[i];hr=String(m.hr||'').trim();if(!hr)continue;t=String(m.fecha||'');score=hmToInt(t);name=String(m.darsena||m.evento||'').trim();if(!idx[hr]||score>=idx[hr].score)idx[hr]={name:name,time:t,score:score};}return idx;}
+function stageFromEvent(ev){var e=String(ev||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toUpperCase();if(e.includes('FIN DE CARGA'))return'ev-fin';if(e.includes('INICIO DE CARGA'))return'ev-ini';if(e.includes('ASIGNACION DE CARGA'))return'ev-asig';return'';}
+
+function getSlaSeconds(eventName, equipo){
+  var ev=String(eventName||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toUpperCase();
+  var eq=String(equipo||'').toUpperCase();
+  var defMin=SLA_CONFIG.defaults[ev]; if(typeof defMin!=='number') defMin=20;
+  var ov=(SLA_CONFIG.byEquipo[eq]||{})[ev];
+  var mins=(typeof ov==='number')?ov:defMin;
+  return Math.max(0, mins*60);
+}
+
+function formatDur(ms){var s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600);s-=h*3600;var m=Math.floor(s/60);s-=m*60;var pad=n=>n<10?'0'+n:n;return pad(h)+':'+pad(m)+':'+pad(s);}
+
+/* ==== Dibujo del camión ==== */
+function drawTruck(cfg, trk, idx) {
+  var Lm = eqLenM(trk.tipo_equipo) * (cfg.scale || 1);
+  var hPx = STATE.basePxH * (cfg.hScale || cfg.scale || 1);
+  var xm = cfg.x, ym = cfg.y, sepM = (cfg.sep_m != null ? cfg.sep_m : 1);
+
+  if (cfg.stack === 'upBase' && (cfg.angle || 0) === -90) {
+    var p0 = toPx(0, 0), half = ((Lm * p0.sx) / p0.sy) / 2; ym = cfg.y - half - idx * (Lm + sepM);
+  } else if (cfg.stack === 'up') { ym -= idx * (Lm + sepM); }
+  else if (cfg.stack === 'along') { xm += idx * (Lm + sepM); }
+  else if (cfg.stack === 'screenY') { var p1 = toPx(0, 0), mH = hPx * (1 / p1.sy); ym += idx * (mH + sepM); }
+
+  var p = toPx(xm, ym), wPx = Lm * p.sx;
+  var el = document.createElement('div');
+  el.className = 'truck';
+  el.style.width = wPx + 'px'; el.style.height = hPx + 'px';
+  el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+
+  // Alineo por izquierda si anchor:'left'
+  var angle = (cfg.angle || 0);
+  if (cfg.anchor === 'left') {
+    el.style.transformOrigin = 'left center';
+    el.style.transform = 'translate(0,-50%) rotate(' + angle + 'deg)';
+  } else {
+    el.style.transformOrigin = 'center center';
+    el.style.transform = 'translate(-50%,-50%) rotate(' + angle + 'deg)';
+  }
+
+  var col = getDockColor(cfg.id);
+  el.style.background = col.bg; el.style.color = col.ink; el.style.borderColor = col.bg;
+
+  var isDetallada = (cfg.id === 'DOCK1' || cfg.id === 'DOCK2' || cfg.id === 'DOCK3' || cfg.id === 'ALERO' || cfg.id === 'CARPA');
+  if (isDetallada) {
+    var tipo = trk.tipo_viaje || trk.tipo || trk.tipo_zona || '';
+    var hr = trk.hr || '', pat = trk.patente || '';
+    var evInfo = LAST_BY_HR[String(hr)] || {};
+    var evName = evInfo.name || '—', tHH = evInfo.time || '';
+    var start = tHH ? hhmmToEpoch(tHH) : 0, pillCls = stageFromEvent(evName);
+
+    var inner = document.createElement('div');
+    var isHorizontal = (cfg.angle === 0);
+    inner.className = 'tc ' + (isHorizontal ? 'tc-h' : 'tc-v');
+    inner.style.transform = 'rotate(' + (-(cfg.angle || 0)) + 'deg)';
+
+    // columna izquierda: TIPO
+    var left = document.createElement('div');
+    left.className = 'left';
+    left.textContent = tipo || '';
+    inner.appendChild(left);
+
+    // centro: HR + Patente
+    var mid = document.createElement('div');
+    mid.className = 'mid';
+    mid.innerHTML = '<div><b>HR ' + hr + '</b><br>' + pat + '</div>';
+    inner.appendChild(mid);
+
+    // derecha/abajo: Evento + timer
+    var pill = document.createElement('div');
+    pill.className = 'event-pill ' + pillCls;
+    var words = String(evName).split(' ');
+    pill.innerHTML = '<span>' + (words.slice(0, 2).join(' ') || '') + '</span><span>' + (words.slice(2).join(' ') || '') + '</span>' +
+      (start ? '<div class="timer" data-start="' + start + '" data-event="' + (evName || '') + '" data-eq="' + (trk.tipo_equipo || '') + '">00:00:00</div>' : '');
+    inner.appendChild(pill);
+
+    el.appendChild(inner);
+
+/* === SOLO ALERO: layout 2 columnas para 0.5TN / 2TN === */
+(function aleroCompactTwoCols(){
+  if (cfg.id !== 'ALERO') return;
+
+  var eq = String(trk.tipo_equipo || '').toUpperCase();
+  if (!/^(0\.5TN|2TN)$/.test(eq)) return;
+
+  // Limpiamos el contenido del 'inner' y armamos 2 columnas
+  inner.className = ''; // quitamos tc/tc-h/tc-v
+  inner.style.transform = 'rotate(' + (-(cfg.angle || 0)) + 'deg)';
+  inner.style.display = 'flex';
+  inner.style.flexDirection = 'row';
+  inner.style.alignItems = 'center';
+  inner.style.justifyContent = 'space-between';
+  inner.style.gap = '8px';
+  inner.style.padding = '8px';
+  inner.innerHTML = '';
+
+  // Columna izquierda: Tipo, HR, Patente
+  var leftCol = document.createElement('div');
+  leftCol.style.flex = '1';
+  leftCol.style.display = 'flex';
+  leftCol.style.flexDirection = 'column';
+  leftCol.style.alignItems = 'flex-start';
+  leftCol.style.gap = '2px';
+
+  var lTipo = document.createElement('div');  lTipo.textContent = (trk.tipo_viaje || trk.tipo || trk.tipo_zona || '');
+  var lHR   = document.createElement('div');  lHR.innerHTML = '<b>HR ' + (trk.hr || '') + '</b>';
+  var lPat  = document.createElement('div');  lPat.textContent = (trk.patente || 'S/Pat');
+
+  leftCol.append(lTipo, lHR, lPat);
+
+  // Columna derecha: Evento (pill) + Timer debajo
+  var rightCol = document.createElement('div');
+  rightCol.style.display = 'flex';
+  rightCol.style.flexDirection = 'column';
+  rightCol.style.alignItems = 'stretch';
+  rightCol.style.gap = '6px';
+  rightCol.style.minWidth = '86px'; // ancho mínimo para que el pill no colapse
+
+  // Pill solo con el texto del evento
+  var words = String(evName).split(' ');
+  var pill2 = document.createElement('div');
+  pill2.className = 'event-pill ' + pillCls;
+  pill2.style.padding = '4px 6px';
+  pill2.style.borderRadius = '10px';
+  pill2.innerHTML = '<span>' + (words.slice(0,2).join(' ') || '') + '</span><span>' + (words.slice(2).join(' ') || '') + '</span>';
+
+  rightCol.appendChild(pill2);
+
+  // Timer debajo del pill (si hay hora)
+  if (start) {
+    var tim = document.createElement('div');
+    tim.className = 'timer';
+    tim.setAttribute('data-start', String(start));
+    tim.setAttribute('data-event', String(evName || ''));
+    tim.setAttribute('data-eq', String(trk.tipo_equipo || ''));
+    tim.textContent = '00:00:00';
+    rightCol.appendChild(tim);
+  }
+
+  inner.append(leftCol, rightCol);
+
+   // --- Autosize para que todo entre sin ocultarse ---
+  var isHalf = /^0\.5TN$/.test(eq);
+
+  // base más chica si es 0.5TN
+  var fsBase = Math.max(8, Math.floor(hPx * (isHalf ? 0.19 : 0.20)));
+  var fsPill = Math.max(8, fsBase - (isHalf ? 2 : 1));
+
+  // pill y columna derecha un poco más angostos en 0.5TN
+  rightCol.style.minWidth = isHalf ? '74px' : '86px';
+  pill2.style.padding = isHalf ? '3px 5px' : '4px 6px';
+
+  [lTipo, lHR, lPat].forEach(n => {
+    n.style.fontSize = fsBase + 'px';
+    n.style.lineHeight = '1.05';
+    n.style.whiteSpace = 'nowrap';
+  });
+  pill2.style.fontSize = fsPill + 'px';
+
+  function overflows(){
+    return inner.scrollWidth > el.clientWidth - 4 ||
+           inner.scrollHeight > el.clientHeight - 4;
+  }
+  var guard = 14;
+  while (overflows() && fsBase > 8 && guard--){
+    fsBase--; fsPill = Math.max(8, fsBase - (isHalf ? 2 : 1));
+    [lTipo, lHR, lPat].forEach(n => n.style.fontSize = fsBase + 'px');
+    pill2.style.fontSize = fsPill + 'px';
+  }
+
+})();
+
+
+    /* ======================================================================== */
+
+  } else {
+    /* PRESENTADO / PLAYA → simple (sin cronómetro) */
+    var raw = document.createElement('div');
+    raw.className = 'tc-raw';
+    raw.innerHTML =
+      '<div class="big line1">HR ' + (trk.hr || '') + '</div>' +
+      '<div class="big line2">' + (trk.patente || 'S/Pat') + '</div>';
+    el.appendChild(raw);
+
+    // ======= AUTOSIZE PARA QUE QUEPA =======
+    var bases = Math.floor(STATE.basePxH * (cfg.hScale || cfg.scale || 1));
+    var fs = Math.max(9, Math.min(Math.floor(bases * 0.36), 18)); // heurística inicial
+
+    var lines = raw.querySelectorAll('.big');
+    lines.forEach(n => {
+      n.style.fontSize = fs + 'px';
+      n.style.whiteSpace = 'nowrap';
+    });
+
+    function overflow() {
+      return raw.scrollWidth > el.clientWidth - 4 || raw.scrollHeight > el.clientHeight - 4;
+    }
+    var guard = 10;
+    while (overflow() && fs > 8 && guard--) {
+      fs -= 1;
+      lines.forEach(n => n.style.fontSize = fs + 'px');
+    }
+    // =======================================
+  }
+
+  overlay.appendChild(el);
+}
+
+/* ==== Render ==== */
+function groupByDock(rows){var map={};for(var i=0;i<rows.length;i++){var r=rows[i],d=normalizeDockName(r.darsenaActual);(map[d]||(map[d]=[])).push(r);}return map;}
+function render(DATA){
+  clearOverlay();window.__lastData=DATA;
+  var rows=(DATA.en_planta_rows||[]).map(r=>Object.assign({},r,{darsenaActual:normalizeDockName(r.darsenaActual)}));
+  var byDock=groupByDock(rows);LAST_BY_HR=buildLastEventByHr(DATA.en_planta_movs||[]);
+for (var i = 0; i < STATE.docks.length; i++) {
+  var cfg = STATE.docks[i];
+  var list = (byDock[cfg.id] || []).slice().sort((a,b)=>String(a.hr||'').localeCompare(String(b.hr||'')));
+
+ if (cfg.id === 'PLAYA') {
+  var baseCfg = Object.assign({}, cfg, { angle: 30, anchor: 'left' });
+  var list = (byDock[cfg.id] || []).slice()
+              .sort((a,b)=>String(a.hr||'').localeCompare(String(b.hr||'')));
+
+  var px0 = toPx(0,0), sx = px0.sx, sy = px0.sy;
+  var rad = (baseCfg.angle || 0) * Math.PI / 180;
+
+  // separación pequeña y pareja
+  var sepM = 2; // probá 0.3–0.6 a gusto
+
+  // altura proyectada vertical (px) de un camión rotado a 45°
+  function projVertPx(trk){
+    var Lm  = 1;
+    var hPx = STATE.basePxH * (baseCfg.hScale || baseCfg.scale || 1);
+    var wPx = Lm * sx;
+    return Math.abs(wPx * Math.sin(rad)) + Math.abs(hPx * Math.cos(rad));
+  }
+
+  // precalcular alturas proyectadas
+  var Hpx = list.map(projVertPx);
+
+  // apilamos por CENTROS usando mitad-mitad -> sin solapes ni “huecos”
+  var yCenter = baseCfg.y;
+  for (var j = 0; j < list.length; j++) {
+    var cfgItem = Object.assign({}, baseCfg, { y: yCenter, stack: 'none' });
+    drawTruck(cfgItem, list[j], j);
+
+    if (j < list.length - 1) {
+      var halfCurrM = (Hpx[j]   / sy) / 2;
+      var halfNextM = (Hpx[j+1] / sy) / 2;
+      yCenter += halfCurrM + halfNextM + sepM;
+    }
+  }
+} else {
+  for (var j = 0; j < list.length; j++) drawTruck(cfg, list[j], j);
+}
+
+}
+
+  loading.textContent=(DATA.meta&&DATA.meta.ts_ba)?('Actualizado: '+DATA.meta.ts_ba):'Datos locales';
+  setupLiveTimers();
+}
+
+/* ==== Timers con SLA por evento/equipo ==== */
+var timerHandle=null;
+function setupLiveTimers(){
+  if(timerHandle){clearInterval(timerHandle);timerHandle=null;}
+  var nodes=[].slice.call(document.querySelectorAll('.timer[data-start]'));
+  function tick(){
+    var now=Date.now();
+    for(var i=0;i<nodes.length;i++){
+      var n=nodes[i],st=Number(n.getAttribute('data-start')||'0');
+      var ev=n.getAttribute('data-event')||'', eq=n.getAttribute('data-eq')||'';
+      var limitSec=getSlaSeconds(ev, eq);
+      if(!st){n.textContent='00:00:00';continue;}
+      var diff=Math.floor((now-st)/1000),h=Math.floor(diff/3600),m=Math.floor((diff%3600)/60),s=diff%60;
+      var pad=x=>x<10?'0'+x:x; n.textContent=pad(h)+':'+pad(m)+':'+pad(s);
+      if(diff>=limitSec) n.classList.add('overdue'); else n.classList.remove('overdue');
+    }
+  }
+  tick(); timerHandle=setInterval(tick,1000);
+}
+
+/* ==== Carga JSON (Drive Apps Script puente) ==== */
+var JSON_URL= 'https://script.google.com/macros/s/AKfycbwW8_C7xDTOGiqda99_b5vM8lEV4WwqX78DUvx3pFG26kZ9N3_d5agZ1TbJXtUD2zcQ/exec';
+function loadHoy(){
+  loading.textContent='Cargando…';
+  fetch(JSON_URL,{cache:'no-store',mode:'cors'})
+    .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.text();})
+    .then(txt=>{var data=JSON.parse(txt);render(data);})
+    .catch(e=>{console.warn('Fallo remoto, uso SAMPLE_JSON',e);render(SAMPLE_JSON);});
+}
+window.addEventListener('resize',()=>{if(window.__lastData)render(window.__lastData);});
+loadHoy();
+</script>
+</body>
+</html>

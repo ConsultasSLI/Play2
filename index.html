@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Rotador Playa & Cargas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body{
+      margin:0;
+      padding:0;
+      height:100%;
+      width:100%;
+      background:#000;
+      overflow:hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .frame-wrap{
+      position:relative;
+      width:100vw;
+      height:100vh;
+    }
+
+    iframe{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      border:0;
+      display:none;              /* por defecto ocultos */
+    }
+    iframe.active{
+      display:block;             /* solo el activo se ve */
+    }
+
+    /* Botón flotante para pantalla completa (arriba a la derecha) */
+    .fs-btn{
+      position:fixed;
+      top:10px;
+      right:10px;
+      z-index:50;
+      padding:10px 16px;
+      border-radius:999px;
+      border:none;
+      background:rgba(15,23,42,.9);
+      color:#e5e7eb;
+      font-weight:700;
+      cursor:pointer;
+      font-size:14px;
+      box-shadow:0 4px 12px rgba(0,0,0,.5);
+    }
+    .fs-btn:active{transform:translateY(1px);}
+  </style>
+</head>
+<body>
+  <!-- Botón general de pantalla completa -->
+ <button id="btnFS" class="fs-btn" style="display: none;">Pantalla completa</button>
+
+  <div class="frame-wrap">
+    <!-- ⬇️ Ajustá los nombres según como guardes tus archivos -->
+    <iframe id="view1"
+            class="active"
+            src="playa_cargas.html"
+            title="Playa & Cargas"
+            allowfullscreen></iframe>
+
+    <iframe id="view2"
+            src="mapa_playa.html"
+            title="Mapa de Playa"
+            allowfullscreen></iframe>
+  </div>
+
+  <script>
+    // ===== Rotación entre vistas =====
+    const DURACION_MS = 30000; // 30 segundos
+
+    const iframes = [
+      document.getElementById('view1'),
+      document.getElementById('view2')
+    ];
+
+    let indice = 0;
+
+    function mostrar(index){
+      iframes.forEach((frame, i)=>{
+        frame.classList.toggle('active', i === index);
+      });
+    }
+
+    // Arranca mostrando el primero
+    mostrar(indice);
+
+    // Cada 30s cambia al siguiente
+    setInterval(()=>{
+      indice = (indice + 1) % iframes.length;
+      mostrar(indice);
+    }, DURACION_MS);
+
+    // ===== Pantalla completa a nivel rotador =====
+    const btnFS = document.getElementById('btnFS');
+
+    function isFullscreen(){
+      return !!(document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.msFullscreenElement);
+    }
+
+    async function enterFS(){
+      const el = document.documentElement;
+      try{
+        if (el.requestFullscreen)          await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+        else if (el.msRequestFullscreen)     await el.msRequestFullscreen();
+      }catch(e){ console.log('Error al entrar en FS', e); }
+    }
+
+    async function exitFS(){
+      try{
+        if (document.exitFullscreen)          await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        else if (document.msExitFullscreen)     await document.msExitFullscreen();
+      }catch(e){ console.log('Error al salir de FS', e); }
+    }
+
+   // function updateFSUI(){
+    //  const fs = isFullscreen();
+ //     btnFS.textContent = fs ? 'Salir de pantalla completa' : 'Pantalla completa';
+   // }
+
+    btnFS.addEventListener('click', ()=>{
+      if (isFullscreen()) exitFS(); else enterFS();
+    });
+
+    // Enter (OK en control remoto) para entrar, Escape/Back para salir
+    document.addEventListener('keydown', (e)=>{
+      const k = e.key;
+      if (!isFullscreen() && (k === 'Enter' || k === 'Accept')) {
+        enterFS();
+      } else if (isFullscreen() && (k === 'Escape' || k === 'Backspace')) {
+        exitFS();
+      }
+    });
+
+    ['fullscreenchange','webkitfullscreenchange','MSFullscreenChange'].forEach(ev=>{
+      document.addEventListener(ev, updateFSUI);
+    });
+
+    // Estado inicial del texto del botón
+    updateFSUI();
+  </script>
+</body>
+</html>
