@@ -54,7 +54,7 @@
 </head>
 <body>
   <!-- Botón general de pantalla completa -->
- <button id="btnFS" class="fs-btn" style="display: none;">Pantalla completa</button>
+  <button id="btnFS" class="fs-btn">Pantalla completa</button>
 
   <div class="frame-wrap">
     <!-- ⬇️ Ajustá los nombres según como guardes tus archivos -->
@@ -122,10 +122,10 @@
       }catch(e){ console.log('Error al salir de FS', e); }
     }
 
-   // function updateFSUI(){
-    //  const fs = isFullscreen();
- //     btnFS.textContent = fs ? 'Salir de pantalla completa' : 'Pantalla completa';
-   // }
+    function updateFSUI(){
+      const fs = isFullscreen();
+      btnFS.textContent = fs ? 'Salir de pantalla completa' : 'Pantalla completa';
+    }
 
     btnFS.addEventListener('click', ()=>{
       if (isFullscreen()) exitFS(); else enterFS();
