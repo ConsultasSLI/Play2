@@ -93,16 +93,16 @@
         <!-- Aumenté el viewBox a 180x100 y ensanché PRESENTADO y PLAYA -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 100" width="100%" height="100%">
           <rect class="border" x="0.25" y="0.25" width="179.5" height="99.5" rx="1.6"/>
-          <!-- PRESENTADO: x=2, width=16 (antes 8) -->
+          <!-- PRESENTADO: x=2, width=13 -->
           <rect class="panel" x="2"  y="6" width="13" height="93" rx="0"/>
-          <!-- PLAYA: desplazado y más ancho para mantener proporción -->
+          <!-- PLAYA -->
           <rect class="panel" x="16" y="6" width="20" height="93" rx="1.2"/>
           <!-- ALERO -->
           <rect class="panel" x="108" y="0.2" width="72" height="21" rx="0"/>
           <!-- CARPA -->
           <rect class="panel" x="150" y="23" width="30" height="72" rx="0"/>
 
-          <!-- Docks inferiores (desplazados +20 respecto del original) -->
+          <!-- Docks inferiores -->
           <g id="docks">
             <rect x="46" y="86" height="12" style="fill:var(--panel);stroke:none" width="98"></rect>
             <line class="dock-part" x1="46"  y1="86" x2="46"  y2="100"></line>
@@ -142,13 +142,10 @@ var STATE={map:{width_m:140,height_m:100},docks:[
   {id:'CARPA',x:128,y:93,angle:-90,scale:3,hScale:0,stack:'upBase',sep_m:1}
 ],eqLengthsM:{'SEMI':18,'SEMI DOBLE':18,'ACOPLADO':18,'14TN':15,'8TN':12,'4TN':10,'2TN':8,'0.5TN':6},basePxH:50};
 
-/* === SLA PARAMETRIZABLE ===
-   - Cambiá minutos por evento en "defaults".
-   - Poné overrides por equipo en "byEquipo".
-*/
+/* === SLA PARAMETRIZABLE === */
 var SLA_CONFIG = {
   defaults: {
-    'ASIGNACION DE CARGA': 20,   // minutos
+    'ASIGNACION DE CARGA': 20,
     'INICIO DE CARGA': 20,
     'FIN DE CARGA': 20
   },
@@ -156,7 +153,6 @@ var SLA_CONFIG = {
     'SEMI':        { 'INICIO DE CARGA': 20, 'ASIGNACION DE CARGA': 20, 'FIN DE CARGA': 20 },
     'SEMI DOBLE':  { 'INICIO DE CARGA': 20, 'ASIGNACION DE CARGA': 20, 'FIN DE CARGA': 20 },
     '4TN':         { 'INICIO DE CARGA': 20, 'ASIGNACION DE CARGA': 20, 'FIN DE CARGA': 20 }
-    // Agregá '8TN', '14TN', etc. si querés otros tiempos
   }
 };
 
@@ -243,7 +239,7 @@ function drawTruck(cfg, trk, idx) {
 
   var isDetallada = (cfg.id === 'DOCK1' || cfg.id === 'DOCK2' || cfg.id === 'DOCK3' || cfg.id === 'ALERO' || cfg.id === 'CARPA');
   if (isDetallada) {
-    var tipo = trk.tipo_viaje || trk.tipo || trk.tipo_zona || '';
+    var tipo =  trk.tipo_zona || '';
     var hr = trk.hr || '', pat = trk.patente || '';
     var evInfo = LAST_BY_HR[String(hr)] || {};
     var evName = evInfo.name || '—', tHH = evInfo.time || '';
@@ -284,7 +280,7 @@ function drawTruck(cfg, trk, idx) {
   if (!/^(0\.5TN|2TN)$/.test(eq)) return;
 
   // Limpiamos el contenido del 'inner' y armamos 2 columnas
-  inner.className = ''; // quitamos tc/tc-h/tc-v
+  inner.className = '';
   inner.style.transform = 'rotate(' + (-(cfg.angle || 0)) + 'deg)';
   inner.style.display = 'flex';
   inner.style.flexDirection = 'row';
@@ -302,7 +298,7 @@ function drawTruck(cfg, trk, idx) {
   leftCol.style.alignItems = 'flex-start';
   leftCol.style.gap = '2px';
 
-  var lTipo = document.createElement('div');  lTipo.textContent = (trk.tipo_viaje || trk.tipo || trk.tipo_zona || '');
+  var lTipo = document.createElement('div');  lTipo.textContent = ( trk.tipo_zona || '');
   var lHR   = document.createElement('div');  lHR.innerHTML = '<b>HR ' + (trk.hr || '') + '</b>';
   var lPat  = document.createElement('div');  lPat.textContent = (trk.patente || 'S/Pat');
 
@@ -314,9 +310,8 @@ function drawTruck(cfg, trk, idx) {
   rightCol.style.flexDirection = 'column';
   rightCol.style.alignItems = 'stretch';
   rightCol.style.gap = '6px';
-  rightCol.style.minWidth = '86px'; // ancho mínimo para que el pill no colapse
+  rightCol.style.minWidth = '86px';
 
-  // Pill solo con el texto del evento
   var words = String(evName).split(' ');
   var pill2 = document.createElement('div');
   pill2.className = 'event-pill ' + pillCls;
@@ -326,7 +321,6 @@ function drawTruck(cfg, trk, idx) {
 
   rightCol.appendChild(pill2);
 
-  // Timer debajo del pill (si hay hora)
   if (start) {
     var tim = document.createElement('div');
     tim.className = 'timer';
@@ -341,12 +335,8 @@ function drawTruck(cfg, trk, idx) {
 
    // --- Autosize para que todo entre sin ocultarse ---
   var isHalf = /^0\.5TN$/.test(eq);
-
-  // base más chica si es 0.5TN
   var fsBase = Math.max(8, Math.floor(hPx * (isHalf ? 0.19 : 0.20)));
   var fsPill = Math.max(8, fsBase - (isHalf ? 2 : 1));
-
-  // pill y columna derecha un poco más angostos en 0.5TN
   rightCol.style.minWidth = isHalf ? '74px' : '86px';
   pill2.style.padding = isHalf ? '3px 5px' : '4px 6px';
 
@@ -384,7 +374,7 @@ function drawTruck(cfg, trk, idx) {
 
     // ======= AUTOSIZE PARA QUE QUEPA =======
     var bases = Math.floor(STATE.basePxH * (cfg.hScale || cfg.scale || 1));
-    var fs = Math.max(9, Math.min(Math.floor(bases * 0.36), 18)); // heurística inicial
+    var fs = Math.max(9, Math.min(Math.floor(bases * 0.36), 18));
 
     var lines = raw.querySelectorAll('.big');
     lines.forEach(n => {
@@ -424,10 +414,8 @@ for (var i = 0; i < STATE.docks.length; i++) {
   var px0 = toPx(0,0), sx = px0.sx, sy = px0.sy;
   var rad = (baseCfg.angle || 0) * Math.PI / 180;
 
-  // separación pequeña y pareja
-  var sepM = 2; // probá 0.3–0.6 a gusto
+  var sepM = 2;
 
-  // altura proyectada vertical (px) de un camión rotado a 45°
   function projVertPx(trk){
     var Lm  = 1;
     var hPx = STATE.basePxH * (baseCfg.hScale || baseCfg.scale || 1);
@@ -435,10 +423,8 @@ for (var i = 0; i < STATE.docks.length; i++) {
     return Math.abs(wPx * Math.sin(rad)) + Math.abs(hPx * Math.cos(rad));
   }
 
-  // precalcular alturas proyectadas
   var Hpx = list.map(projVertPx);
 
-  // apilamos por CENTROS usando mitad-mitad -> sin solapes ni “huecos”
   var yCenter = baseCfg.y;
   for (var j = 0; j < list.length; j++) {
     var cfgItem = Object.assign({}, baseCfg, { y: yCenter, stack: 'none' });
@@ -480,17 +466,47 @@ function setupLiveTimers(){
   tick(); timerHandle=setInterval(tick,1000);
 }
 
-/* ==== Carga JSON (Drive Apps Script puente) ==== */
-var JSON_URL= 'https://script.google.com/macros/s/AKfycbwW8_C7xDTOGiqda99_b5vM8lEV4WwqX78DUvx3pFG26kZ9N3_d5agZ1TbJXtUD2zcQ/exec';
+/* ==== Carga JSON (Drive Apps Script puente) + Auto-Refresh ==== */
+var JSON_URL='https://script.google.com/macros/s/AKfycbwW8_C7xDTOGiqda99_b5vM8lEV4WwqX78DUvx3pFG26kZ9N3_d5agZ1TbJXtUD2zcQ/exec';
+var REFRESH_MS=60000;           // 60 segundos
+var isLoading=false;            // evita solapes si una carga tarda
+var refreshHandle=null;
+
 function loadHoy(){
+  if(isLoading) return;
+  isLoading=true;
+  loading.style.display='block';
   loading.textContent='Cargando…';
-  fetch(JSON_URL,{cache:'no-store',mode:'cors'})
+
+  // cache-buster para asegurarnos que no venga del cache del navegador/proxy
+  var url = JSON_URL + (JSON_URL.indexOf('?')>-1?'&':'?') + 't=' + Date.now();
+
+  fetch(url,{cache:'no-store',mode:'cors'})
     .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.text();})
     .then(txt=>{var data=JSON.parse(txt);render(data);})
-    .catch(e=>{console.warn('Fallo remoto, uso SAMPLE_JSON',e);render(SAMPLE_JSON);});
+    .catch(e=>{console.warn('Fallo remoto, uso SAMPLE_JSON',e);render(SAMPLE_JSON);})
+    .finally(()=>{isLoading=false; loading.style.display='none';});
 }
+
+// Re-render on resize
 window.addEventListener('resize',()=>{if(window.__lastData)render(window.__lastData);});
+
+// Auto-refresh cada 60s. Pausa si la pestaña está oculta y retoma al volver.
+function startAutoRefresh(){
+  stopAutoRefresh();
+  refreshHandle=setInterval(()=>{ if(!document.hidden){ loadHoy(); } }, REFRESH_MS);
+}
+function stopAutoRefresh(){
+  if(refreshHandle){ clearInterval(refreshHandle); refreshHandle=null; }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ stopAutoRefresh(); }
+  else { loadHoy(); startAutoRefresh(); }
+});
+
+// Primera carga + arranque del ciclo
 loadHoy();
+startAutoRefresh();
 </script>
 </body>
 </html>
