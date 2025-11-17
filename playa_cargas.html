@@ -176,6 +176,18 @@
       td.situ-late {background:#ef4444;color:#3b0a0a;border-color:#7f1d1d}
       td.situ-info {background:#60a5fa;color:#0b214a;border-color:#1e40af}
       td.situ-neut {background:#cbd5e1;color:#0b1220;border-color:#64748b}
+            /* Variantes MÁS CLARAS solo para filas de SALIDAS */
+      tr.row-salida td.situ-ok{
+        background:#bbf7d0;   /* verde bien clarito */
+        color:#000000;
+        border-color:#93e2b0;
+      }
+      tr.row-salida td.situ-late{
+        background:#fecaca;   /* rojo clarito */
+        color:#000000;
+        border-color:#e07979;
+      }
+
 
       @keyframes blinkSync {
         0%,100% { filter: brightness(0.96); box-shadow: 0 0 0 rgba(255,255,255,0); }
@@ -707,7 +719,8 @@
           const fin         = t.fin    || "";
           const eq          = r.tipo_equipo || "";
 
-          rowsHTML.push(`<tr>
+         rowsHTML.push(`<tr class="row-salida">
+
             <td>${r.hr||""}</td><td>${r.patente||""}</td><td class="t-time">${horaCarga}</td><td><b>${estadoCalc || r.estado || ""}</b></td>
             <td>${r.vuelta||""}</td><td>${r.tipo_viaje||""}</td><td>${r.tipo_equipo||""}</td><td>${r.tipo_zona||""}</td>
             <td>${transp}</td>
