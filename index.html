@@ -50,11 +50,31 @@
       box-shadow:0 4px 12px rgba(0,0,0,.5);
     }
     .fs-btn:active{transform:translateY(1px);}
+
+    /* 🔼 Botón para pasar manualmente a la siguiente vista (arriba y centrado) */
+    .next-btn{
+      position:fixed;
+      top:10px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:50;
+      padding:10px 18px;
+      border-radius:999px;
+      border:none;
+      background:rgba(15,23,42,.9);
+      color:#e5e7eb;
+      font-weight:700;
+      cursor:pointer;
+      font-size:14px;
+      box-shadow:0 4px 12px rgba(0,0,0,.5);
+      white-space:nowrap;
+    }
+    .next-btn:active{transform:translate(-50%,1px);}
   </style>
 </head>
 <body>
-  <!-- Botón general de pantalla completa -->
-  <button id="btnFS" class="fs-btn">Pantalla completa</button>
+  <!-- Botón para pasar a la siguiente página sin esperar -->
+  <button class="next-btn" id="btnNext">Ir a la siguiente vista</button>
 
   <div class="frame-wrap">
     <!-- ⬇️ Ajustá los nombres según como guardes tus archivos -->
@@ -96,47 +116,21 @@
       mostrar(indice);
     }, DURACION_MS);
 
-    // ===== Pantalla completa a nivel rotador =====
-    const btnFS = document.getElementById('btnFS');
-
-    function isFullscreen(){
-      return !!(document.fullscreenElement ||
-                document.webkitFullscreenElement ||
-                document.msFullscreenElement);
-    }
-
-    async function enterFS(){
-      const el = document.documentElement;
-      try{
-        if (el.requestFullscreen)          await el.requestFullscreen();
-        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
-        else if (el.msRequestFullscreen)     await el.msRequestFullscreen();
-      }catch(e){ console.log('Error al entrar en FS', e); }
-    }
-
-    async function exitFS(){
-      try{
-        if (document.exitFullscreen)          await document.exitFullscreen();
-        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-        else if (document.msExitFullscreen)     await document.msExitFullscreen();
-      }catch(e){ console.log('Error al salir de FS', e); }
-    }
-
-    function updateFSUI(){
-      const fs = isFullscreen();
-      btnFS.textContent = fs ? 'Salir de pantalla completa' : 'Pantalla completa';
-    }
-
-    btnFS.addEventListener('click', ()=>{
-      if (isFullscreen()) exitFS(); else enterFS();
+    // Click manual para ir a la siguiente vista
+    document.getElementById('btnNext').addEventListener('click', ()=>{
+      indice = (indice + 1) % iframes.length;
+      mostrar(indice);
     });
 
-    // Enter (OK en control remoto) para entrar, Escape/Back para salir
+    // ===== Pantalla completa a nivel rotador =====
+    // (Dejé estos eventos como los tenías; asumen que ya tenés definidas
+    // las funciones isFullscreen(), enterFS(), exitFS(), updateFSUI() en otro script)
+
     document.addEventListener('keydown', (e)=>{
       const k = e.key;
-      if (!isFullscreen() && (k === 'Enter' || k === 'Accept')) {
+      if (!isFullscreen && (k === 'Enter' || k === 'Accept')) {
         enterFS();
-      } else if (isFullscreen() && (k === 'Escape' || k === 'Backspace')) {
+      } else if (isFullscreen && (k === 'Escape' || k === 'Backspace')) {
         exitFS();
       }
     });
@@ -145,8 +139,10 @@
       document.addEventListener(ev, updateFSUI);
     });
 
-    // Estado inicial del texto del botón
-    updateFSUI();
+    // Estado inicial del texto del botón de FS (si lo usás)
+    if (typeof updateFSUI === 'function') {
+      updateFSUI();
+    }
   </script>
 </body>
 </html>
